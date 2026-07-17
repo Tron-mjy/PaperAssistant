@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - PaperAssistant</title>
+    {% load static %}
+    <style>
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            background: #f1f5f9;
+            display: flex; align-items: center; justify-content: center; min-height: 100vh;
+        }
+        .auth-card {
+            background: #fff; border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,.1);
+            padding: 40px; width: 400px; max-width: 95vw;
+        }
+        .auth-card h1 { font-size: 24px; color: #4f46e5; margin-bottom: 4px; }
+        .auth-card .subtitle { font-size: 13px; color: #94a3b8; margin-bottom: 28px; }
+        .form-group { margin-bottom: 18px; }
+        .form-group label { display: block; font-size: 13px; font-weight: 600; color: #475569; margin-bottom: 6px; }
+        .form-group input {
+            width: 100%; padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px;
+            font-size: 14px; outline: none; transition: border-color .15s;
+        }
+        .form-group input:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,.15); }
+        .btn-submit {
+            width: 100%; padding: 12px; background: #4f46e5; color: #fff; border: none;
+            border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; transition: background .15s;
+        }
+        .btn-submit:hover { background: #4338ca; }
+        .btn-submit:disabled { opacity: .6; cursor: not-allowed; }
+        .error-msg { color: #ef4444; font-size: 13px; margin-bottom: 12px; display: none; }
+        .auth-link { text-align: center; margin-top: 16px; font-size: 13px; color: #64748b; }
+        .auth-link a { color: #4f46e5; text-decoration: none; font-weight: 500; }
+        .auth-link a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+    <div class="auth-card">
+        <h1>PaperAssistant</h1>
+        <p class="subtitle">AI 论文陪读助手 — 登录</p>
+        <div id="errorMsg" class="error-msg"></div>
+        <div class="form-group">
+            <label for="username">用户名</label>
+            <input type="text" id="username" placeholder="请输入用户名" autocomplete="username">
+        </div>
+        <div class="form-group">
+            <label for="password">密码</label>
+            <input type="password" id="password" placeholder="请输入密码" autocomplete="current-password">
+        </div>
+        <button id="submitBtn" class="btn-submit">登 录</button>
+        <p class="auth-link">还没有账号？<a href="/register/">立即注册</a></p>
+    </div>
+
+    <script>
+        function getCookie(name) {
+            let value = null;
+            if (document.cookie && document.cookie !== '') {
+                for (let c of document.cookie.split(';')) {
+                    c = c.trim();
+                    if (c.startsWith(name + '=')) { value = decodeURIComponent(c.substring(name.length + 1)); break; }
+                }
+            }
+            return value;
+        }
+        const csrftoken = getCookie('csrftoken');
+        const errorEl = document.getElementById('errorMsg');
+        const submitBtn = document.getElementById('submitBtn');
+
+        document.getElementById('password').addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') doLogin();
+        });
+
+        document.getElementById('submitBtn').addEventListener('click', doLogin);
+
+        async function doLogin() {
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+            if (!username || !password) {
+                errorEl.textContent = '请输入用户名和密码';
+                errorEl.style.display = 'block';
+                return;
+            }
+            submitBtn.disabled = true;
+            submitBtn.textContent = '登录中...';
+            errorEl.style.display = 'none';
+            try {
+                const res = await fetch('/login/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrftoken },
+                    body: JSON.stringify({ username, password }),
+                });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || '登录失败');
+                }
+                window.location.href = '/';
+            } catch (err) {
+                errorEl.textContent = err.message;
+                errorEl.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '登 录';
+            }
+        }
+    </script>
+</body>
+</html>
