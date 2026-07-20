@@ -1,5 +1,3 @@
-import os
-
 from django.conf import settings
 from django.db import models
 
@@ -17,15 +15,6 @@ class Paper(models.Model):
 
     def __str__(self):
         return self.filename
-
-    def delete(self, *args, **kwargs):
-        if self.file:
-            try:
-                if os.path.isfile(self.file.path):
-                    os.remove(self.file.path)
-            except (OSError, ValueError):
-                pass
-        super().delete(*args, **kwargs)
 
 
 class Vocabulary(models.Model):
