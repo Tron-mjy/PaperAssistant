@@ -195,45 +195,34 @@ def word_lookup(request):
     if not word:
         return JsonResponse({'error': '请输入要查询的单词'}, status=400)
 
-    if paper_id:
-        try:
-            paper = Paper.objects.get(id=paper_id, user=request.user)
-            if not context and paper.extracted_text:
-                text = paper.extracted_text
-                idx = text.lower().find(word.lower())
-                if idx >= 0:
-                    start = max(0, idx - 500)
-                    end = min(len(text), idx + len(word) + 500)
-                    context = text[start:end]
-        except Paper.DoesNotExist:
-            pass
+    if not paper_id:
+        return JsonResponse({'error': '请先上传PDF文档'}, status=400)
+
+    paper = get_object_or_404(Paper, id=paper_id, user=request.user)
+    if not context and paper.extracted_text:
+        text = paper.extracted_text
+        idx = text.lower().find(word.lower())
+        if idx >= 0:
+            start = max(0, idx - 500)
+            end = min(len(text), idx + len(word) + 500)
+            context = text[start:end]
 
     try:
         result = lookup_word(word, context)
     except Exception as e:
         return JsonResponse({'error': f'AI查询失败: {str(e)}'}, status=500)
 
-    if paper_id:
-        try:
-            paper = Paper.objects.get(id=paper_id, user=request.user)
-            existing = Vocabulary.objects.filter(
-                user=request.user,
-                paper=paper,
-                word__iexact=word,
-            ).first()
-            if existing:
-                existing.meaning_context = result['meaning']
-                existing.save(update_fields=['meaning_context'])
-            else:
-                Vocabulary.objects.create(
-                    user=request.user,
-                    paper=paper,
-                    word=word,
-                    meaning_general='',
-                    meaning_context=result['meaning'],
-                )
-        except Paper.DoesNotExist:
-            pass
+    existing = Vocabulary.objects.filter(
+        user=request.user, paper=paper, word__iexact=word,
+    ).first()
+    if existing:
+        existing.meaning_context = result['meaning']
+        existing.save(update_fields=['meaning_context'])
+    else:
+        Vocabulary.objects.create(
+            user=request.user, paper=paper, word=word,
+            meaning_general='', meaning_context=result['meaning'],
+        )
 
     return JsonResponse({'word': word, 'meaning': result['meaning']})
 
@@ -250,13 +239,11 @@ def paragraph_explain(request):
     if not paragraph:
         return JsonResponse({'error': '请选择要解释的文本'}, status=400)
 
-    paper_context = ''
-    if paper_id:
-        try:
-            paper = Paper.objects.get(id=paper_id, user=request.user)
-            paper_context = paper.extracted_text
-        except Paper.DoesNotExist:
-            pass
+    if not paper_id:
+        return JsonResponse({'error': '请先上传PDF文档'}, status=400)
+
+    paper = get_object_or_404(Paper, id=paper_id, user=request.user)
+    paper_context = paper.extracted_text
 
     try:
         result = explain_paragraph(paragraph, paper_context)
@@ -278,13 +265,11 @@ def ask_ai(request):
     if not question:
         return JsonResponse({'error': '请输入您的问题'}, status=400)
 
-    paper_context = ''
-    if paper_id:
-        try:
-            paper = Paper.objects.get(id=paper_id, user=request.user)
-            paper_context = paper.extracted_text
-        except Paper.DoesNotExist:
-            pass
+    if not paper_id:
+        return JsonResponse({'error': '请先上传PDF文档'}, status=400)
+
+    paper = get_object_or_404(Paper, id=paper_id, user=request.user)
+    paper_context = paper.extracted_text
 
     try:
         result = ask_question(question, paper_context)
