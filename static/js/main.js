@@ -34,6 +34,10 @@ const historySidebar = $('#historySidebar');
 const historyList = $('#historyList');
 const sidebarToggle = $('#sidebarToggle');
 const historyCloseBtn = $('#historyCloseBtn');
+const vsplitter = $('#vsplitter');
+const rightUpper = $('#rightUpper');
+const rightLower = $('#rightLower');
+const rightPanel = $('#rightPanel');
 
 // ===== CSRF & API =====
 function getCookie(name) {
@@ -128,6 +132,32 @@ window.addEventListener('mouseup', function() {
 });
 window.addEventListener('resize', function() { applyWidth(_leftW); });
 
+// ===== Vertical splitter (right panel) =====
+if (vsplitter && rightUpper && rightLower) {
+    var _vY = 0, _vH = 0, _vOn = false;
+    rightUpper.style.flex = 'none';
+    rightUpper.style.height = Math.round(rightPanel.offsetHeight * 0.7) + 'px';
+
+    vsplitter.addEventListener('mousedown', function(e) {
+        _vOn = true; _vY = e.clientY; _vH = rightUpper.offsetHeight;
+        vsplitter.classList.add('active');
+        document.body.style.cursor = 'row-resize'; document.body.style.userSelect = 'none';
+        e.preventDefault();
+    });
+    window.addEventListener('mousemove', function(e) {
+        if (!_vOn) return;
+        var h = _vH + (e.clientY - _vY);
+        h = Math.max(150, Math.min(rightPanel.offsetHeight - 180, h));
+        rightUpper.style.height = h + 'px';
+    });
+    window.addEventListener('mouseup', function() {
+        if (!_vOn) return;
+        _vOn = false;
+        vsplitter.classList.remove('active');
+        document.body.style.cursor = ''; document.body.style.userSelect = '';
+    });
+}
+
 // ===== Sidebar =====
 sidebarToggle.addEventListener('click', function() { historySidebar.classList.toggle('open'); loadHistory(); });
 historyCloseBtn.addEventListener('click', function() { historySidebar.classList.remove('open'); });
@@ -162,7 +192,7 @@ async function loadPaper(id) {
     showLoading('正在加载...');
     try {
         var ctx = await (await fetch('/api/paper/' + id + '/context/')).json();
-        currentPaperId = ctx.id; currentPaperText = ctx.extracted_text || ''; paperTitle.textContent = ctx.filename;
+        currentPaperId = ctx.id || id; currentPaperText = ctx.extracted_text || ''; paperTitle.textContent = ctx.filename;
         if (ctx.file_url) { pdfObject.data = ctx.file_url; pdfObject.style.display = ''; pdfWelcome.style.display = 'none'; }
         try { var ana = await (await fetch('/api/paper/' + id + '/analysis/')).json(); if (ana.analysis) showAnalysis(ana.analysis); } catch (e) {}
         await loadVocabulary(); loadHistory(); hideLoading(); showToast('论文已加载', 'success');
@@ -179,7 +209,7 @@ function resetViewer() {
 }
 
 // ===== Upload =====
-document.querySelector('.upload-btn').addEventListener('click', function() { pdfUpload.click(); });
+document.querySelector('.header-upload-btn').addEventListener('click', function() { pdfUpload.click(); });
 pdfUpload.addEventListener('change', async function(e) {
     var file = e.target.files[0]; if (!file) return; await handleUpload(file); pdfUpload.value = '';
 });
@@ -204,10 +234,16 @@ function showAnalysis(text) {
     analysisSection.style.display = ''; analysisContent.innerHTML = renderMarkdown(text);
     analysisContent.classList.remove('collapsed'); analysisToggle.classList.remove('collapsed'); analysisToggle.textContent = '▼';
 }
-analysisHeader.addEventListener('click', function() {
+function toggleAnalysis() {
+    if (!analysisContent) return;
     var c = analysisContent.classList.toggle('collapsed');
-    analysisToggle.classList.toggle('collapsed', c); analysisToggle.textContent = c ? '▶' : '▼';
-});
+    if (analysisToggle) {
+        analysisToggle.classList.toggle('collapsed', c);
+        analysisToggle.textContent = c ? '▶' : '▼';
+    }
+}
+if (analysisHeader) analysisHeader.addEventListener('click', toggleAnalysis);
+if (analysisToggle) analysisToggle.addEventListener('click', function(e) { e.stopPropagation(); toggleAnalysis(); });
 
 // ===== Word Lookup =====
 wordSearchBtn.addEventListener('click', function() { lookupWord(); });
@@ -216,6 +252,7 @@ wordInput.addEventListener('keydown', function(e) { if (e.key === 'Enter') looku
 async function lookupWord() {
     var word = wordInput.value.trim();
     if (!word) { showToast('请输入单词', 'error'); return; }
+    if (!currentPaperId) { showToast('请先上传或加载一篇论文', 'error'); return; }
     wordSearchBtn.disabled = true; wordSearchBtn.textContent = '查询中...';
     wordResult.innerHTML = '<div class="placeholder-text">查询中...</div>';
     try {
@@ -235,6 +272,7 @@ qaInput.addEventListener('keydown', function(e) { if (e.key === 'Enter' && e.ctr
 
 async function askAI() {
     var q = qaInput.value.trim(); if (!q) { showToast('请输入问题', 'error'); return; }
+    if (!currentPaperId) { showToast('请先上传或加载一篇论文', 'error'); return; }
     qaBtn.disabled = true; qaBtn.textContent = '思考中...';
     try {
         var data = await (await api('/api/ask/', {
